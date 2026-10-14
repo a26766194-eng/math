@@ -56,7 +56,7 @@ label{font-size:13px;color:#777}.badge{display:inline-block;background:#fff0e3;c
 </section>
 <section id="tab-set" class="hidden">
  <div class="card"><b>🔑 Gemini API 키</b>
-  <input id="key" type="password" placeholder="AIza... 로 시작하는 키">
+  <input id="key" type="password" placeholder="Gemini API 키를 붙여넣으세요">
   <label>모델</label><select id="model"><option value="gemini-3.8-flash">gemini-3.8-flash (기본)</option><option value="gemini-3-flash-preview">gemini-3-flash-preview</option><option value="gemini-flash-lite-latest">gemini-flash-lite-latest (빠름)</option></select>
   <div class="row"><button class="btn" id="saveKey">저장</button><button class="btn red" id="delKey">키 지우기</button></div>
   <p class="note">🔒 키는 <b>이 브라우저(이 기기)에만</b> 저장되고, 저희 서버나 다른 곳으로 보내지지 않아요. 문제를 풀 때만 Google로 직접 전송돼요. 키는 Google AI Studio(aistudio.google.com)에서 무료로 받을 수 있어요.</p><div id="keyMsg" class="note hidden"></div></div>
@@ -88,7 +88,7 @@ const PROMPT=lv=>`당신은 한국 ${lv} 수학 교사를 돕는 친절한 조�
 "similar":[{"question":"유사 문항","answer":"정답","explanation":"짧은 해설"}] (정확히 3개, 같은 개념·난이도, 숫자/조건 변경),
 "variant":{"question":"조금 더 어려운 변형 문항","answer":"정답","explanation":"짧은 해설"}}
 모든 정답은 직접 검산하세요.`;
-async function callGemini(){const s=loadS(),key=(s.key||$('#key').value||'').replace(/[^\x21-\x7E]/g,'');if(key&&!/^[A-Za-z0-9_\-]+$/.test(key))throw new Error('API 키에 이상한 글자가 섞였어요. 설정에서 키를 다시 붙여넣어 주세요.');if(!key)throw new Error('API 키가 아직 없어요. [설정] 탭에서 Gemini 키를 넣어주세요 🙏');
+async function callGemini(){const s=loadS(),key=(s.key||$('#key').value||'').replace(/[^\x21-\x7E]/g,'').replace(/^[\"'`]+|[\"'`.,;\s]+$/g,'');if(!key)throw new Error('API 키가 아직 없어요. [설정] 탭에서 Gemini 키를 넣어주세요 🙏');
  const m=s.model||'gemini-3.8-flash',body={contents:[{role:'user',parts:[{text:PROMPT($('#level').value)},{inline_data:{mime_type:mime,data:img.split(',')[1]}}]}],generationConfig:{temperature:.2,responseMimeType:'application/json'}};
  let res;for(const md of [m,...MODELS.filter(x=>x!=m)]){try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(md)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body)})}catch(e){if(!navigator.onLine)throw new Error('인터넷 연결을 확인해주세요.');throw new Error('Gemini 서버에 연결하지 못했어요. 키를 다시 붙여넣거나 잠시 후 다시 시도해주세요. ('+(e&&e.message||e)+')')}if(![404,500,503].includes(res.status))break}
  if(res.status==401||res.status==403)throw new Error('API 키가 맞지 않는 것 같아요. 설정에서 다시 확인해주세요.');if(res.status==429)throw new Error('요청이 잠시 많았어요. 조금 뒤 다시 해볼까요?');if(!res.ok)throw new Error('Gemini 오류 ('+res.status+')');
