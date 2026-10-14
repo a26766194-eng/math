@@ -64,6 +64,7 @@ label{font-size:13px;color:#777}.badge{display:inline-block;background:#fff0e3;c
 </main>
 <script>
 const $=s=>document.querySelector(s),LK='mt_settings',LL='mt_library';
+const PRO=['gemini-pro-latest','gemini-3-pro-preview','gemini-2.5-pro'];
 const MODELS=['gemini-3.8-flash','gemini-3-flash-preview','gemini-flash-lite-latest'];
 let img=null,mime='image/jpeg',cur=null;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -87,6 +88,10 @@ const PROMPT=lv=>`당신은 한국 ${lv} 수학 교사를 돕는 친절한 조�
 {"problem":"문제 원문","unit":"교육과정 단원(예: 고1 공통수학1 > 이차방정식)","grade":"학년","difficulty":"하|중|상|최상","concepts":["핵심 개념"],"steps":["단계별 풀이"],"answer":"정답",
 "similar":[{"question":"유사 문항","answer":"정답","explanation":"짧은 해설"}] (정확히 3개, 같은 개념·난이도, 숫자/조건 변경),
 "variant":{"question":"조금 더 어려운 변형 문항","answer":"정답","explanation":"짧은 해설"}}
+[그림·그래프 읽기 규칙]
+- 그래프나 도형이 있으면 has_graph를 true로 하고, 풀기 전에 observations에 그림에서 읽은 값을 하나씩 적으세요. 예: "x=1: 빈 점 4, 채워진 점 1", "3<x<4: 높이 1인 가로선, x=3 채워진 점 1", "x=4: 빈 점 3, 채워진 점 2(함숫값)".
+- 빈 점(○)은 함숫값이 아니고, 채워진 점(●)이 함숫값입니다. 좌극한·우극한은 각각 그 방향의 그래프 조각이 다가가는 높이입니다.
+- 풀이는 반드시 observations에 적은 값만 사용하세요. 그림이 없으면 has_graph는 false, observations는 빈 배열.
 [풀이 작성 규칙]
 - 현재 한국 교육과정(2022 개정 교육과정, 해당 학년이 아직 적용 전이면 2015 개정)의 해당 학년·과목 범위 안의 개념과 방법만 사용하세요. 교육과정 밖의 공식(예: 로피탈 정리, 중학생에게 미분)은 쓰지 마세요.
 - 교과서·학교 시험 풀이처럼 단계를 나누세요: ① 문제 조건 정리 ② 사용할 개념·공식과 그 이유 ③ 식 세우기 ④ 계산 과정을 한 줄씩 생략 없이 ⑤ 조건 확인(정의역, 범위, 부호 등)과 검산 ⑥ 결론.
@@ -102,9 +107,9 @@ const PROMPT=lv=>`당신은 한국 ${lv} 수학 교사를 돕는 친절한 조�
 - 답을 정하기 전에 구한 해를 원래 식에 대입해 성립하는지 꼭 확인하고, 조건(예: x>0)에 맞지 않는 해는 빼세요.
 - 유사·변형 문항 해설도 핵심 단계를 2~4줄로 쓰세요.
 모든 정답은 직접 검산하세요.`;
-async function callGemini(){const s=loadS(),key=(s.key||$('#key').value||'').replace(/[^\x21-\x7E]/g,'').replace(/^[\"'`]+|[\"'`.,;\s]+$/g,'');if(!key)throw new Error('API 키가 아직 없어요. [설정] 탭에서 Gemini 키를 넣어주세요 🙏');
- const m=s.model||'gemini-3.8-flash',body={contents:[{role:'user',parts:[{text:PROMPT($('#level').value)},{inline_data:{mime_type:mime,data:img.split(',')[1]}}]}],generationConfig:{temperature:0,responseMimeType:'application/json',responseSchema:{type:'OBJECT',properties:{problem:{type:'STRING'},unit:{type:'STRING'},grade:{type:'STRING'},difficulty:{type:'STRING'},concepts:{type:'ARRAY',items:{type:'STRING'}},steps:{type:'ARRAY',items:{type:'STRING'}},answer:{type:'STRING'},similar:{type:'ARRAY',items:{type:'OBJECT',properties:{question:{type:'STRING'},answer:{type:'STRING'},explanation:{type:'STRING'}},required:['question','answer','explanation']}},variant:{type:'OBJECT',properties:{question:{type:'STRING'},answer:{type:'STRING'},explanation:{type:'STRING'}},required:['question','answer','explanation']}},required:['problem','unit','grade','difficulty','concepts','steps','answer','similar','variant']}}};
- let res;for(const md of [m,...MODELS.filter(x=>x!=m)]){$('#status').textContent='열심히 풀고 있어요… ⏳ ('+md+')';const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),70000);try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(md)+':generateContent?key='+encodeURIComponent(key),{method:'POST',signal:ac.signal,headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body)});clearTimeout(tm)}catch(e){clearTimeout(tm);if(e.name=='AbortError'){res=null;continue}if(!navigator.onLine)throw new Error('인터넷 연결을 확인해주세요.');throw new Error('Gemini 서버에 연결하지 못했어요. 키를 다시 붙여넣거나 잠시 후 다시 시도해주세요. ('+(e&&e.message||e)+')')}if(![404,500,503].includes(res.status))break}
+async function callGemini(mo){const s=loadS(),key=(s.key||$('#key').value||'').replace(/[^\x21-\x7E]/g,'').replace(/^[\"'`]+|[\"'`.,;\s]+$/g,'');if(!key)throw new Error('API 키가 아직 없어요. [설정] 탭에서 Gemini 키를 넣어주세요 🙏');
+ const m=mo||s.model||'gemini-3.8-flash',body={contents:[{role:'user',parts:[{text:PROMPT($('#level').value)},{inline_data:{mime_type:mime,data:img.split(',')[1]}}]}],generationConfig:{temperature:0,responseMimeType:'application/json',responseSchema:{type:'OBJECT',properties:{has_graph:{type:'BOOLEAN'},observations:{type:'ARRAY',items:{type:'STRING'}},problem:{type:'STRING'},unit:{type:'STRING'},grade:{type:'STRING'},difficulty:{type:'STRING'},concepts:{type:'ARRAY',items:{type:'STRING'}},steps:{type:'ARRAY',items:{type:'STRING'}},answer:{type:'STRING'},similar:{type:'ARRAY',items:{type:'OBJECT',properties:{question:{type:'STRING'},answer:{type:'STRING'},explanation:{type:'STRING'}},required:['question','answer','explanation']}},variant:{type:'OBJECT',properties:{question:{type:'STRING'},answer:{type:'STRING'},explanation:{type:'STRING'}},required:['question','answer','explanation']}},required:['has_graph','observations','problem','unit','grade','difficulty','concepts','steps','answer','similar','variant']}}};
+ let res;for(const md of (mo?[mo]:[m,...MODELS.filter(x=>x!=m)])){$('#status').textContent='열심히 풀고 있어요… ⏳ ('+md+')';const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),70000);try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(md)+':generateContent?key='+encodeURIComponent(key),{method:'POST',signal:ac.signal,headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body)});clearTimeout(tm)}catch(e){clearTimeout(tm);if(e.name=='AbortError'){res=null;continue}if(!navigator.onLine)throw new Error('인터넷 연결을 확인해주세요.');throw new Error('Gemini 서버에 연결하지 못했어요. 키를 다시 붙여넣거나 잠시 후 다시 시도해주세요. ('+(e&&e.message||e)+')')}if(![404,500,503].includes(res.status))break}
  if(!res)throw new Error('AI 응답이 너무 오래 걸렸어요. 사진을 문제 하나만 보이게 잘라서 다시 시도해주세요.');
  if(res.status==401||res.status==403)throw new Error('API 키가 맞지 않는 것 같아요. 설정에서 다시 확인해주세요.');if(res.status==429)throw new Error('요청이 잠시 많았어요. 조금 뒤 다시 해볼까요?');if(!res.ok)throw new Error('Gemini 오류 ('+res.status+')');
  const d=await res.json(),t=(d?.candidates?.[0]?.content?.parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('');
@@ -115,9 +120,9 @@ function norm(j){if(Array.isArray(j))j=j[0]||{};if(j&&!j.problem&&!j.steps){cons
  const g=(...k)=>{for(const x of k)if(j[x]!=null&&j[x]!=='')return j[x];return ''},arr=v=>Array.isArray(v)?v.map(x=>typeof x=='string'?x:(x.text||x.content||x.step||JSON.stringify(x))):(v?String(v).split(/\n+/).filter(Boolean):[]),
  q=x=>typeof x=='string'?{question:x,answer:'',explanation:''}:{question:x.question||x.problem||x['문제']||'',answer:x.answer||x['정답']||'',explanation:x.explanation||x.solution||x['해설']||''};
  const sim=g('similar','similar_problems','유사문항','유사 문항');
- return {problem:String(g('problem','question','문제','문제 원문')),unit:String(g('unit','단원')),grade:String(g('grade','학년')),difficulty:String(g('difficulty','난이도')),concepts:arr(g('concepts','핵심 개념','개념')),steps:arr(g('steps','solution','풀이','단계별 풀이')),answer:String(g('answer','정답')),similar:(Array.isArray(sim)?sim:[]).map(q),variant:(v=>v?q(v):null)(g('variant','변형','변형 문항'))}}
+ return {has_graph:!!j.has_graph,observations:arr(g('observations','읽은 값')),problem:String(g('problem','question','문제','문제 원문')),unit:String(g('unit','단원')),grade:String(g('grade','학년')),difficulty:String(g('difficulty','난이도')),concepts:arr(g('concepts','핵심 개념','개념')),steps:arr(g('steps','solution','풀이','단계별 풀이')),answer:String(g('answer','정답')),similar:(Array.isArray(sim)?sim:[]).map(q),variant:(v=>v?q(v):null)(g('variant','변형','변형 문항'))}}
 $('#solveBtn').onclick=async()=>{$('#err').textContent='';$('#status').textContent='열심히 풀고 있어요… ⏳';$('#solveBtn').disabled=true;
- try{cur=await callGemini();cur.img=img;showResult();try{$('#status').textContent='정답을 한 번 더 검산하고 있어요… 🔍';const v=await verify(cur);if(v&&v.ok===false&&v.answer){cur.answer=v.answer+' (검산 후 수정)';cur.steps=(cur.steps||[]).concat(['🔍 검산 결과: '+(v.note||'처음 답과 달라 수정했어요. 선생님 확인을 권해요.')]);showResult()}else if(v){cur.steps=(cur.steps||[]).concat(['🔍 검산 완료: '+(v.note||'답이 맞아요.')]);showResult()}}catch(e){}}catch(e){$('#err').textContent=e.message}finally{$('#status').textContent='';$('#solveBtn').disabled=false}};
+ try{cur=await callGemini();cur.img=img;showResult();if(cur.has_graph){for(const pm of PRO){try{$('#status').textContent='그래프 문제라 더 꼼꼼한 모델로 다시 읽고 있어요… 🔎 ('+pm+')';const pr=await callGemini(pm);if(pr&&(pr.problem||(pr.steps||[]).length)){pr.img=img;pr.proModel=pm;cur=pr;showResult();break}}catch(e){}}}try{$('#status').textContent='정답을 한 번 더 검산하고 있어요… 🔍';const v=await verify(cur);if(v&&v.ok===false&&v.answer){cur.answer=v.answer+' (검산 후 수정)';cur.steps=(cur.steps||[]).concat(['🔍 검산 결과: '+(v.note||'처음 답과 달라 수정했어요. 선생님 확인을 권해요.')]);showResult()}else if(v){cur.steps=(cur.steps||[]).concat(['🔍 검산 완료: '+(v.note||'답이 맞아요.')]);showResult()}}catch(e){}}catch(e){$('#err').textContent=e.message}finally{$('#status').textContent='';$('#solveBtn').disabled=false}};
 
 async function verify(r){const s=loadS(),key=(s.key||$('#key').value||'').replace(/[^\x21-\x7E]/g,'');const m=s.model||MODELS[0];
  const t='아래는 첨부한 수학 문제에 대한 다른 사람의 풀이 정답입니다. 풀이를 보지 말고 문제를 처음부터 직접 다시 풀고, 숫자를 대입해 검산하세요. 객관식이면 보기 번호도 확인하세요. JSON만 출력: {"ok":true/false,"answer":"내가 구한 정답","note":"한두 문장 근거"}\n제시된 정답: '+r.answer;
@@ -129,7 +134,7 @@ async function verify(r){const s=loadS(),key=(s.key||$('#key').value||'').replac
 const qa=(p,i)=>`<div class="prob"><b>${i}.</b> ${esc(p.question)}<div class="ans"><b>정답:</b> ${esc(p.answer)}<br>${esc(p.explanation)}</div></div>`;
 function showResult(){const r=cur;$('#r-problem').innerHTML=esc(r.problem);
  $('#r-meta').innerHTML=`<span class="badge">📚 ${esc(r.unit)}</span><span class="badge">🎯 난이도 ${esc(r.difficulty)}</span>`+(r.concepts||[]).map(c=>`<span class="badge">${esc(c)}</span>`).join('');
- $('#r-steps').innerHTML=(r.steps||[]).map((s,i)=>`<div class="step"><b>${i+1}단계</b> ${esc(s)}</div>`).join('');$('#r-answer').innerHTML=esc(r.answer);
+ $('#r-steps').innerHTML=((r.observations||[]).length?`<div class="step" style="background:#fff7e0"><b>👀 그림에서 읽은 값</b> (선생님, 이 값이 맞는지 먼저 확인해주세요)<br>${r.observations.map(o=>'• '+esc(o)).join('<br>')}${r.proModel?'<br><small>정밀 모델로 다시 읽음: '+esc(r.proModel)+'</small>':''}</div>`:'')+(r.steps||[]).map((s,i)=>`<div class="step"><b>${i+1}단계</b> ${esc(s)}</div>`).join('');$('#r-answer').innerHTML=esc(r.answer);
  $('#r-similar').innerHTML=(r.similar||[]).map((p,i)=>qa(p,i+1)).join('');$('#r-variant').innerHTML=r.variant?qa(r.variant,'★'):'';
  if(!r.problem&&!(r.steps||[]).length)$('#err').textContent='풀이를 읽지 못했어요. 사진을 문제만 보이게 잘라서 다시 올려주세요.';$('#s-grade').value=r.grade||'';$('#s-unit').value=r.unit||'';$('#result').classList.remove('hidden');$('#saveMsg').classList.add('hidden');math($('#result'))}
 // worksheet
