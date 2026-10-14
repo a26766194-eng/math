@@ -106,6 +106,18 @@ const PROMPT=lv=>`당신은 한국 ${lv} 수학 교사를 돕는 친절한 조�
 - 함수를 놓을 때는 조건이 정해주는 만큼만 놓고 나머지는 미지수로 두세요(예: 이차함수는 (x-a)^2+p(x-a)+q 꼴).
 - 답을 정하기 전에 구한 해를 원래 식에 대입해 성립하는지 꼭 확인하고, 조건(예: x>0)에 맞지 않는 해는 빼세요.
 - 유사·변형 문항 해설도 핵심 단계를 2~4줄로 쓰세요.
+[모범 풀이 예시 — 이런 방식으로 쓰세요]
+문제(중2 도형): 직사각형 ABCD에서 BE=CD, EC=DF가 되도록 점 E(BC 위), F(CD 위)를 잡았다. ∠FDG=24°(∠CDE=24°)일 때 ∠x=∠FBE는?
+풀이:
+1단계 (보조선) BF와 평행하도록, AB 위에 BH=DF인 점 H를 잡고 선분 DH를 긋는다.
+2단계 BH=DF이고 BH∥DF이므로 □HBFD는 평행사변형이다.
+3단계 CD=BE, ∠DCE=∠EBH=90°, EC=HB이므로 △DCE≡△EBH (SAS 합동).
+4단계 합동인 삼각형의 대응변과 대응각에서 DE=EH이고, ∠BEH=∠CDE이다. 그래서 ∠DEC+∠BEH=∠DEC+∠CDE=90°, 즉 ∠DEH=90°이다.
+5단계 따라서 △DEH는 직각이등변삼각형이고 ∠HDE=45°이다.
+6단계 ∠HDF=45°+24°=69°이고, 평행사변형의 대각은 같으므로 ∠HBF=69°이다.
+7단계 ∴ ∠x=∠FBE=90°−69°=21°
+(포인트: 해당 학년에서 배운 도구(합동, 평행사변형, 이등변삼각형)만 쓰고, 루트·닮음·삼각비처럼 아직 안 배운 도구는 쓰지 않았다. 보조선을 왜 긋는지 밝히고, 각 단계의 근거(합동 조건, 대응각, 대각)를 적었다.)
+- 학년이 중학교면, 그 학년에서 아직 배우지 않은 도구(예: 중2에게 제곱근·닮음·삼각비, 중1에게 피타고라스 정리)는 쓰지 말고 위 예시처럼 합동·각의 성질로 푸세요.
 모든 정답은 직접 검산하세요.`;
 async function callGemini(mo){const s=loadS(),key=(s.key||$('#key').value||'').replace(/[^\x21-\x7E]/g,'').replace(/^[\"'`]+|[\"'`.,;\s]+$/g,'');if(!key)throw new Error('API 키가 아직 없어요. [설정] 탭에서 Gemini 키를 넣어주세요 🙏');
  const m=mo||s.model||'gemini-3.8-flash',body={contents:[{role:'user',parts:[{text:PROMPT($('#level').value)},{inline_data:{mime_type:mime,data:img.split(',')[1]}}]}],generationConfig:{temperature:0,responseMimeType:'application/json',responseSchema:{type:'OBJECT',properties:{has_graph:{type:'BOOLEAN'},observations:{type:'ARRAY',items:{type:'STRING'}},problem:{type:'STRING'},unit:{type:'STRING'},grade:{type:'STRING'},difficulty:{type:'STRING'},concepts:{type:'ARRAY',items:{type:'STRING'}},steps:{type:'ARRAY',items:{type:'STRING'}},answer:{type:'STRING'},similar:{type:'ARRAY',items:{type:'OBJECT',properties:{question:{type:'STRING'},answer:{type:'STRING'},explanation:{type:'STRING'}},required:['question','answer','explanation']}},variant:{type:'OBJECT',properties:{question:{type:'STRING'},answer:{type:'STRING'},explanation:{type:'STRING'}},required:['question','answer','explanation']}},required:['has_graph','observations','problem','unit','grade','difficulty','concepts','steps','answer','similar','variant']}}};
