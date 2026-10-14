@@ -89,11 +89,18 @@ const PROMPT=lv=>`당신은 한국 ${lv} 수학 교사를 돕는 친절한 조�
 "variant":{"question":"조금 더 어려운 변형 문항","answer":"정답","explanation":"짧은 해설"}}
 모든 정답은 직접 검산하세요.`;
 async function callGemini(){const s=loadS(),key=(s.key||$('#key').value||'').replace(/[^\x21-\x7E]/g,'').replace(/^[\"'`]+|[\"'`.,;\s]+$/g,'');if(!key)throw new Error('API 키가 아직 없어요. [설정] 탭에서 Gemini 키를 넣어주세요 🙏');
- const m=s.model||'gemini-3.8-flash',body={contents:[{role:'user',parts:[{text:PROMPT($('#level').value)},{inline_data:{mime_type:mime,data:img.split(',')[1]}}]}],generationConfig:{temperature:.2,responseMimeType:'application/json'}};
+ const m=s.model||'gemini-3.8-flash',body={contents:[{role:'user',parts:[{text:PROMPT($('#level').value)},{inline_data:{mime_type:mime,data:img.split(',')[1]}}]}],generationConfig:{temperature:.2,responseMimeType:'application/json',responseSchema:{type:'OBJECT',properties:{problem:{type:'STRING'},unit:{type:'STRING'},grade:{type:'STRING'},difficulty:{type:'STRING'},concepts:{type:'ARRAY',items:{type:'STRING'}},steps:{type:'ARRAY',items:{type:'STRING'}},answer:{type:'STRING'},similar:{type:'ARRAY',items:{type:'OBJECT',properties:{question:{type:'STRING'},answer:{type:'STRING'},explanation:{type:'STRING'}},required:['question','answer','explanation']}},variant:{type:'OBJECT',properties:{question:{type:'STRING'},answer:{type:'STRING'},explanation:{type:'STRING'}},required:['question','answer','explanation']}},required:['problem','unit','grade','difficulty','concepts','steps','answer','similar','variant']}}};
  let res;for(const md of [m,...MODELS.filter(x=>x!=m)]){try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(md)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body)})}catch(e){if(!navigator.onLine)throw new Error('인터넷 연결을 확인해주세요.');throw new Error('Gemini 서버에 연결하지 못했어요. 키를 다시 붙여넣거나 잠시 후 다시 시도해주세요. ('+(e&&e.message||e)+')')}if(![404,500,503].includes(res.status))break}
  if(res.status==401||res.status==403)throw new Error('API 키가 맞지 않는 것 같아요. 설정에서 다시 확인해주세요.');if(res.status==429)throw new Error('요청이 잠시 많았어요. 조금 뒤 다시 해볼까요?');if(!res.ok)throw new Error('Gemini 오류 ('+res.status+')');
  const d=await res.json(),t=(d?.candidates?.[0]?.content?.parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('');
- return JSON.parse(t.replace(/^```(json)?|```$/g,'').trim())}
+ if(!t.trim()){const fr=d?.candidates?.[0]?.finishReason||d?.promptFeedback?.blockReason||'';throw new Error('AI가 빈 답을 보냈어요. 사진을 더 선명하게 찍어 다시 시도해주세요. '+fr)}
+ let j;try{const c=t.replace(/^\s*```(json)?/i,'').replace(/```\s*$/,'').trim();j=JSON.parse(c.slice(c.indexOf(c.trim()[0]=='['?'[':'{')))}catch(e){return {problem:'',steps:[t],answer:'',similar:[],raw:true}}
+ return norm(j)}
+function norm(j){if(Array.isArray(j))j=j[0]||{};if(j&&!j.problem&&!j.steps){const v=Object.values(j).find(x=>x&&typeof x=='object'&&!Array.isArray(x)&&(x.problem||x.steps));if(v)j=v}
+ const g=(...k)=>{for(const x of k)if(j[x]!=null&&j[x]!=='')return j[x];return ''},arr=v=>Array.isArray(v)?v.map(x=>typeof x=='string'?x:(x.text||x.content||x.step||JSON.stringify(x))):(v?String(v).split(/\n+/).filter(Boolean):[]),
+ q=x=>typeof x=='string'?{question:x,answer:'',explanation:''}:{question:x.question||x.problem||x['문제']||'',answer:x.answer||x['정답']||'',explanation:x.explanation||x.solution||x['해설']||''};
+ const sim=g('similar','similar_problems','유사문항','유사 문항');
+ return {problem:String(g('problem','question','문제','문제 원문')),unit:String(g('unit','단원')),grade:String(g('grade','학년')),difficulty:String(g('difficulty','난이도')),concepts:arr(g('concepts','핵심 개념','개념')),steps:arr(g('steps','solution','풀이','단계별 풀이')),answer:String(g('answer','정답')),similar:(Array.isArray(sim)?sim:[]).map(q),variant:(v=>v?q(v):null)(g('variant','변형','변형 문항'))}}
 $('#solveBtn').onclick=async()=>{$('#err').textContent='';$('#status').textContent='열심히 풀고 있어요… ⏳';$('#solveBtn').disabled=true;
  try{cur=await callGemini();cur.img=img;showResult()}catch(e){$('#err').textContent=e.message}finally{$('#status').textContent='';$('#solveBtn').disabled=false}};
 const qa=(p,i)=>`<div class="prob"><b>${i}.</b> ${esc(p.question)}<div class="ans"><b>정답:</b> ${esc(p.answer)}<br>${esc(p.explanation)}</div></div>`;
@@ -101,7 +108,7 @@ function showResult(){const r=cur;$('#r-problem').innerHTML=esc(r.problem);
  $('#r-meta').innerHTML=`<span class="badge">📚 ${esc(r.unit)}</span><span class="badge">🎯 난이도 ${esc(r.difficulty)}</span>`+(r.concepts||[]).map(c=>`<span class="badge">${esc(c)}</span>`).join('');
  $('#r-steps').innerHTML=(r.steps||[]).map((s,i)=>`<div class="step"><b>${i+1}단계</b> ${esc(s)}</div>`).join('');$('#r-answer').innerHTML=esc(r.answer);
  $('#r-similar').innerHTML=(r.similar||[]).map((p,i)=>qa(p,i+1)).join('');$('#r-variant').innerHTML=r.variant?qa(r.variant,'★'):'';
- $('#s-grade').value=r.grade||'';$('#s-unit').value=r.unit||'';$('#result').classList.remove('hidden');$('#saveMsg').classList.add('hidden');math($('#result'))}
+ if(!r.problem&&!(r.steps||[]).length)$('#err').textContent='풀이를 읽지 못했어요. 사진을 문제만 보이게 잘라서 다시 올려주세요.';$('#s-grade').value=r.grade||'';$('#s-unit').value=r.unit||'';$('#result').classList.remove('hidden');$('#saveMsg').classList.add('hidden');math($('#result'))}
 // worksheet
 $('#toWs').onclick=()=>tab('ws');$('#printBtn').onclick=()=>window.print();
 function renderWs(){if(!cur)return;const r=cur,qs=[{question:r.problem,answer:r.answer,explanation:(r.steps||[]).join(' → ')},...(r.similar||[]),...(r.variant?[r.variant]:[])];
