@@ -25,8 +25,14 @@ label{font-size:13px;color:#777}.badge{display:inline-block;background:#fff0e3;c
 <nav><button data-t="solve" class="on">문제 풀이</button><button data-t="ws">학습지</button><button data-t="lib">보관함</button><button data-t="set">설정</button></nav>
 <main>
 <section id="tab-solve">
- <div class="card"><b>📷 문제 사진 올리기</b><p class="note">카메라로 찍거나 갤러리에서 골라주세요.</p>
-  <input type="file" id="file" accept="image/*"><img id="preview" alt="미리보기">
+ <div class="card"><b>📷 문제 사진 올리기</b><p class="note">갤러리에서 고르거나, 필요하면 카메라로 찍으세요.</p>
+  <input type="file" id="file" accept="image/*" style="display:none">
+  <input type="file" id="fileCam" accept="image/*" capture="environment" style="display:none">
+  <div class="row" style="margin:8px 0 12px">
+   <button type="button" class="btn" id="btnGallery">갤러리에서 선택</button>
+   <button type="button" class="btn sub" id="btnCamera">카메라로 촬영</button>
+  </div>
+  <img id="preview" alt="미리보기">
   <label>학교급</label><select id="level"><option>중학교</option><option selected>고등학교</option></select>
   <button class="btn" id="solveBtn" disabled>풀이 + 유사 문항 만들기 ✨</button> <span id="status"></span><div id="err" class="err"></div></div>
  <div id="result" class="hidden">
@@ -71,7 +77,11 @@ $('#saveKey').onclick=()=>{localStorage.setItem(LK,JSON.stringify({key:$('#key')
 $('#delKey').onclick=()=>{localStorage.removeItem(LK);$('#key').value='';msg('#keyMsg','키를 지웠어요.')};
 function msg(s,t){const e=$(s);e.textContent=t;e.classList.remove('hidden')}
 // upload
-$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;mime=f.type||'image/jpeg';const r=new FileReader();r.onload=()=>{shrink(r.result).then(d=>{img=d;$('#preview').src=d;$('#preview').style.display='block';$('#solveBtn').disabled=false})};r.readAsDataURL(f)};
+function onPick(inp){const f=inp.files&&inp.files[0];if(!f)return;mime=f.type||'image/jpeg';const r=new FileReader();r.onload=()=>{shrink(r.result).then(d=>{img=d;$('#preview').src=d;$('#preview').style.display='block';$('#solveBtn').disabled=false})};r.readAsDataURL(f);inp.value=''}
+$('#btnGallery').onclick=()=>$('#file').click();
+$('#btnCamera').onclick=()=>$('#fileCam').click();
+$('#file').onchange=e=>onPick(e.target);
+$('#fileCam').onchange=e=>onPick(e.target);
 function shrink(d){return new Promise(res=>{const i=new Image();i.onload=()=>{const m=1600,s=Math.min(1,m/Math.max(i.width,i.height));if(s==1)return res(d);const c=document.createElement('canvas');c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);mime='image/jpeg';res(c.toDataURL('image/jpeg',.9))};i.onerror=()=>res(d);i.src=d})}
 const PROMPT=lv=>`당신은 한국 ${lv} 수학 교사를 돕는 친절한 조교입니다. 첨부한 문제 사진을 읽고 아래 JSON만 출력하세요. 수식은 LaTeX를 $...$ 로 감싸세요.
 {"problem":"문제 원문","unit":"교육과정 단원(예: 고1 공통수학1 > 이차방정식)","grade":"학년","difficulty":"하|중|상|최상","concepts":["핵심 개념"],"steps":["단계별 풀이"],"answer":"정답",
