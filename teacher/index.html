@@ -73,7 +73,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t
 // settings
 function loadS(){try{return JSON.parse(localStorage.getItem(LK)||'{}')}catch(e){return{}}}
 const st=loadS();$('#key').value=st.key||'';if(st.model)$('#model').value=st.model;
-$('#saveKey').onclick=()=>{localStorage.setItem(LK,JSON.stringify({key:$('#key').value.trim(),model:$('#model').value}));msg('#keyMsg','저장했어요! 이제 문제를 풀어볼까요? 😊')};
+$('#saveKey').onclick=()=>{localStorage.setItem(LK,JSON.stringify({key:$('#key').value.replace(/[^\x21-\x7E]/g,''),model:$('#model').value}));msg('#keyMsg','저장했어요! 이제 문제를 풀어볼까요? 😊')};
 $('#delKey').onclick=()=>{localStorage.removeItem(LK);$('#key').value='';msg('#keyMsg','키를 지웠어요.')};
 function msg(s,t){const e=$(s);e.textContent=t;e.classList.remove('hidden')}
 // upload
@@ -88,9 +88,9 @@ const PROMPT=lv=>`당신은 한국 ${lv} 수학 교사를 돕는 친절한 조�
 "similar":[{"question":"유사 문항","answer":"정답","explanation":"짧은 해설"}] (정확히 3개, 같은 개념·난이도, 숫자/조건 변경),
 "variant":{"question":"조금 더 어려운 변형 문항","answer":"정답","explanation":"짧은 해설"}}
 모든 정답은 직접 검산하세요.`;
-async function callGemini(){const s=loadS(),key=(s.key||$('#key').value||'').trim();if(!key)throw new Error('API 키가 아직 없어요. [설정] 탭에서 Gemini 키를 넣어주세요 🙏');
+async function callGemini(){const s=loadS(),key=(s.key||$('#key').value||'').replace(/[^\x21-\x7E]/g,'');if(key&&!/^[A-Za-z0-9_\-]+$/.test(key))throw new Error('API 키에 이상한 글자가 섞였어요. 설정에서 키를 다시 붙여넣어 주세요.');if(!key)throw new Error('API 키가 아직 없어요. [설정] 탭에서 Gemini 키를 넣어주세요 🙏');
  const m=s.model||'gemini-3.8-flash',body={contents:[{role:'user',parts:[{text:PROMPT($('#level').value)},{inline_data:{mime_type:mime,data:img.split(',')[1]}}]}],generationConfig:{temperature:.2,responseMimeType:'application/json'}};
- let res;for(const md of [m,...MODELS.filter(x=>x!=m)]){try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(md)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body)})}catch(e){throw new Error('인터넷 연결을 확인해주세요.')}if(![404,500,503].includes(res.status))break}
+ let res;for(const md of [m,...MODELS.filter(x=>x!=m)]){try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(md)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body)})}catch(e){if(!navigator.onLine)throw new Error('인터넷 연결을 확인해주세요.');throw new Error('Gemini 서버에 연결하지 못했어요. 키를 다시 붙여넣거나 잠시 후 다시 시도해주세요. ('+(e&&e.message||e)+')')}if(![404,500,503].includes(res.status))break}
  if(res.status==401||res.status==403)throw new Error('API 키가 맞지 않는 것 같아요. 설정에서 다시 확인해주세요.');if(res.status==429)throw new Error('요청이 잠시 많았어요. 조금 뒤 다시 해볼까요?');if(!res.ok)throw new Error('Gemini 오류 ('+res.status+')');
  const d=await res.json(),t=(d?.candidates?.[0]?.content?.parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('');
  return JSON.parse(t.replace(/^```(json)?|```$/g,'').trim())}
